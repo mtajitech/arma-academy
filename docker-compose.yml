@@ -1,0 +1,409 @@
+# ─── ARMA Academy — Local Docker Compose ─────────────────────────────────────
+# Runs all 16 services + PostgreSQL + MongoDB + Redis
+# Usage: docker-compose up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.9'
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  arma-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  postgres-data:
+  mongodb-data:
+  redis-data:
+
+services:
+
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arma
+      POSTGRES_PASSWORD: arma_dev_password
+      POSTGRES_MULTIPLE_DATABASES: arma_auth,arma_lms_core,arma_commerce,arma_marketing,arma_analytics,arma_advisor,arma_robo_advisor,arma_notification,arma_blockchain,arma_ukb,arma_content_pipeline
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - arma-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arma"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7-jammy
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: arma
+      MONGO_INITDB_ROOT_PASSWORD: arma_dev_password
+    volumes:
+      - mongodb-data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - arma-internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass arma_dev_password
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - arma-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "arma_dev_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend Services ──────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./apps/api-gateway
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - arma-internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  auth-service:
+    build:
+      context: ./apps/auth-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_auth
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      JWT_EXPIRES_IN: "3600"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  lms-core:
+    build:
+      context: ./apps/lms-core
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_lms_core
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  content-pipeline:
+    build:
+      context: ./apps/content-pipeline
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_content_pipeline
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  ukb-service:
+    build:
+      context: ./apps/ukb-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_ukb
+      MONGODB_URL: mongodb://arma:arma_dev_password@mongodb:27017/arma_ukb
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  blockchain-service:
+    build:
+      context: ./apps/blockchain-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: development
+      PORT: 3005
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_blockchain
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      BLOCKCHAIN_RPC_URL: ""
+      BLOCKCHAIN_CONTRACT_ADDRESS: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  advisor-service:
+    build:
+      context: ./apps/advisor-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      NODE_ENV: development
+      PORT: 3006
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_advisor
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      ANTHROPIC_API_KEY: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  robo-advisor-service:
+    build:
+      context: ./apps/robo-advisor-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_robo_advisor
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      ANTHROPIC_API_KEY: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  commerce-service:
+    build:
+      context: ./apps/commerce-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      NODE_ENV: development
+      PORT: 3008
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_commerce
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      STRIPE_SECRET_KEY: ""
+      FLUTTERWAVE_SECRET_KEY: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  marketing-service:
+    build:
+      context: ./apps/marketing-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    environment:
+      NODE_ENV: development
+      PORT: 3009
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_marketing
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  analytics-service:
+    build:
+      context: ./apps/analytics-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    environment:
+      NODE_ENV: development
+      PORT: 3010
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_analytics
+      MONGODB_URL: mongodb://arma:arma_dev_password@mongodb:27017/arma_analytics
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  notification-service:
+    build:
+      context: ./apps/notification-service
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3011:3011"
+    environment:
+      NODE_ENV: development
+      PORT: 3011
+      DATABASE_URL: postgresql://arma:arma_dev_password@postgres:5432/arma_notification
+      REDIS_URL: redis://:arma_dev_password@redis:6379
+      JWT_SECRET: dev_jwt_secret_replace_in_production
+      SENDGRID_API_KEY: ""
+      TWILIO_ACCOUNT_SID: ""
+      TWILIO_AUTH_TOKEN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - arma-internal
+
+  # ── Frontend Services ─────────────────────────────────────────────────────
+  frontend-academy:
+    build:
+      context: ./apps/frontend-academy
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      NEXT_PUBLIC_API_URL: http://api-gateway:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - arma-internal
+
+  frontend-robo:
+    build:
+      context: ./apps/frontend-robo
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3101:3101"
+    environment:
+      NODE_ENV: production
+      PORT: 3101
+      NEXT_PUBLIC_API_URL: http://api-gateway:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - arma-internal
+
+  frontend-institutional:
+    build:
+      context: ./apps/frontend-institutional
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3102:3102"
+    environment:
+      NODE_ENV: production
+      PORT: 3102
+      NEXT_PUBLIC_API_URL: http://api-gateway:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - arma-internal
+
+  developer-portal:
+    build:
+      context: ./apps/developer-portal
+      dockerfile: Dockerfile
+      target: production
+    restart: unless-stopped
+    ports:
+      - "3103:3103"
+    environment:
+      NODE_ENV: production
+      PORT: 3103
+      NEXT_PUBLIC_API_URL: http://api-gateway:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - arma-internal

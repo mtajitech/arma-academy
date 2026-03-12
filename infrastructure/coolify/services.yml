@@ -1,0 +1,328 @@
+# ─── ARMA Academy — Coolify Deployment Configuration ─────────────────────────
+# One application entry per service.
+# Traefik handles domain routing and SSL termination via Let's Encrypt.
+# IMPORTANT: Never change port numbers — they are hardcoded platform constants.
+# ─────────────────────────────────────────────────────────────────────────────
+
+environment: production
+registry: ghcr.io
+image_prefix: ghcr.io/GITHUB_ORG/arma-academy  # Replace GITHUB_ORG with your GitHub org
+
+ssl:
+  provider: letsencrypt
+  email: tech@africarisk.net
+
+# ─── Domain Routing (via Traefik) ────────────────────────────────────────────
+domains:
+  academy:     training.africarisk.net        # → frontend-academy (3100)
+  api:         api.training.africarisk.net    # → api-gateway (3000)
+  robo:        robo.training.africarisk.net   # → frontend-robo (3101)
+  institutional: institutional.training.africarisk.net  # → frontend-institutional (3102)
+  developer:   developer.training.africarisk.net        # → developer-portal (3103)
+
+# ─── Services ────────────────────────────────────────────────────────────────
+services:
+
+  - name: api-gateway
+    image: ghcr.io/GITHUB_ORG/arma-academy/api-gateway:latest
+    port: 3000
+    environment: production
+    domain: api.training.africarisk.net
+    traefik:
+      rule: Host(`api.training.africarisk.net`)
+      entrypoints: [websecure]
+      tls: { certresolver: letsencrypt }
+      middlewares:
+        - rate-limit
+        - cors-headers
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - REDIS_URL
+      - JWT_SECRET
+
+  - name: auth-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/auth-service:latest
+    port: 3001
+    environment: production
+    internal_only: true          # Not exposed externally — accessed via API gateway
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+
+  - name: lms-core
+    image: ghcr.io/GITHUB_ORG/arma-academy/lms-core:latest
+    port: 3002
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+
+  - name: content-pipeline
+    image: ghcr.io/GITHUB_ORG/arma-academy/content-pipeline:latest
+    port: 3003
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 2
+      memory: 1Gi              # Higher — video transcoding workloads
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - CDN_SECRET_KEY
+
+  - name: ukb-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/ukb-service:latest
+    port: 3004
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - DATABASE_URL
+      - MONGODB_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - ANTHROPIC_API_KEY
+
+  - name: blockchain-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/blockchain-service:latest
+    port: 3005
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - DATABASE_URL
+      - JWT_SECRET
+      - BLOCKCHAIN_RPC_URL
+      - BLOCKCHAIN_PRIVATE_KEY
+      - BLOCKCHAIN_CONTRACT_ADDRESS
+
+  - name: advisor-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/advisor-service:latest
+    port: 3006
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - ANTHROPIC_API_KEY
+
+  - name: robo-advisor-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/robo-advisor-service:latest
+    port: 3007
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - ANTHROPIC_API_KEY
+
+  - name: commerce-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/commerce-service:latest
+    port: 3008
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - STRIPE_SECRET_KEY
+      - FLUTTERWAVE_SECRET_KEY
+
+  - name: marketing-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/marketing-service:latest
+    port: 3009
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - SENDGRID_API_KEY
+      - MAILCHIMP_API_KEY
+
+  - name: analytics-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/analytics-service:latest
+    port: 3010
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 2
+      memory: 1Gi              # Higher — BI pipeline workloads
+    env_secrets:
+      - DATABASE_URL
+      - MONGODB_URL
+      - REDIS_URL
+      - JWT_SECRET
+
+  - name: notification-service
+    image: ghcr.io/GITHUB_ORG/arma-academy/notification-service:latest
+    port: 3011
+    environment: production
+    internal_only: true
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_SECRET
+      - SENDGRID_API_KEY
+      - TWILIO_ACCOUNT_SID
+      - TWILIO_AUTH_TOKEN
+      - FIREBASE_SERVER_KEY
+
+  - name: frontend-academy
+    image: ghcr.io/GITHUB_ORG/arma-academy/frontend-academy:latest
+    port: 3100
+    environment: production
+    domain: training.africarisk.net
+    traefik:
+      rule: Host(`training.africarisk.net`)
+      entrypoints: [websecure]
+      tls: { certresolver: letsencrypt }
+    healthcheck:
+      path: /
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 1
+      memory: 512Mi
+    env_secrets:
+      - NEXT_PUBLIC_API_URL
+
+  - name: frontend-robo
+    image: ghcr.io/GITHUB_ORG/arma-academy/frontend-robo:latest
+    port: 3101
+    environment: production
+    domain: robo.training.africarisk.net
+    traefik:
+      rule: Host(`robo.training.africarisk.net`)
+      entrypoints: [websecure]
+      tls: { certresolver: letsencrypt }
+    healthcheck:
+      path: /
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - NEXT_PUBLIC_API_URL
+
+  - name: frontend-institutional
+    image: ghcr.io/GITHUB_ORG/arma-academy/frontend-institutional:latest
+    port: 3102
+    environment: production
+    domain: institutional.training.africarisk.net
+    traefik:
+      rule: Host(`institutional.training.africarisk.net`)
+      entrypoints: [websecure]
+      tls: { certresolver: letsencrypt }
+    healthcheck:
+      path: /
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - NEXT_PUBLIC_API_URL
+
+  - name: developer-portal
+    image: ghcr.io/GITHUB_ORG/arma-academy/developer-portal:latest
+    port: 3103
+    environment: production
+    domain: developer.training.africarisk.net
+    traefik:
+      rule: Host(`developer.training.africarisk.net`)
+      entrypoints: [websecure]
+      tls: { certresolver: letsencrypt }
+    healthcheck:
+      path: /
+      interval: 30s
+      timeout: 10s
+    resources:
+      cpu: 0.5
+      memory: 256Mi
+    env_secrets:
+      - NEXT_PUBLIC_API_URL

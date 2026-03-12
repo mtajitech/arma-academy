@@ -1,0 +1,14 @@
+{
+  "name": "@arma-academy/shared-types",
+  "version": "0.0.1",
+  "description": "Shared TypeScript interfaces across all ARMA Academy services",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

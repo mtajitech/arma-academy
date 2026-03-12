@@ -1,0 +1,18 @@
+{
+  "name": "@arma-academy/shared-utils",
+  "version": "0.0.1",
+  "description": "Common utilities: logger, error handler, validators",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

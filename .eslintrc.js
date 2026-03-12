@@ -1,0 +1,27 @@
+module.exports = {
+  root: true,
+  env: {
+    node: true,
+    es2021: true,
+  },
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended-requiring-type-checking',
+  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 2021,
+    sourceType: 'module',
+    project: './tsconfig.json',
+  },
+  plugins: ['@typescript-eslint'],
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'warn',
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-floating-promises': 'error',
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+  },
+  ignorePatterns: ['dist/', '.next/', 'node_modules/', '*.js'],
+};

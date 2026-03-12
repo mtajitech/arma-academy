@@ -1,0 +1,26 @@
+{
+  "name": "@arma-academy/developer-portal",
+  "version": "0.0.1",
+  "description": "Developer Portal — API documentation, sandbox, and partner integration hub",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3103",
+    "build": "next build",
+    "start": "next start -p 3103",
+    "lint": "next lint",
+    "test": "jest"
+  },
+  "dependencies": {
+    "next": "14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "14.2.0"
+  }
+}
