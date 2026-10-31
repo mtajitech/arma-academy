@@ -19,7 +19,7 @@
     "docker:logs": "docker-compose logs -f"
   },
   "devDependencies": {
-    "turbo": "^1.13.0",
+    "turbo": "^2.11.10",
     "typescript": "^5.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
